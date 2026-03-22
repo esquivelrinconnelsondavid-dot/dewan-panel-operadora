@@ -22,28 +22,37 @@ async function registrarSW() {
 }
 
 // Genera un beep urgente con Web Audio API (funciona en silencio)
-export function playBeep() {
+export async function playBeep() {
   try {
     const ctx = getAudioCtx();
-    if (ctx.state === 'suspended') ctx.resume();
+    // Asegurar que AudioContext está activo
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+    // Doble check
+    if (ctx.state !== 'running') {
+      console.warn('[AUDIO] AudioContext no está running:', ctx.state);
+      return;
+    }
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
     gain.connect(ctx.destination);
 
-    // 3 beeps rápidos
+    // 3 beeps rápidos y fuertes
     const now = ctx.currentTime;
     osc.frequency.setValueAtTime(1200, now);
-    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.setValueAtTime(0.6, now);
     gain.gain.setValueAtTime(0, now + 0.15);
-    gain.gain.setValueAtTime(0.4, now + 0.25);
+    gain.gain.setValueAtTime(0.6, now + 0.25);
     gain.gain.setValueAtTime(0, now + 0.4);
-    gain.gain.setValueAtTime(0.4, now + 0.5);
-    gain.gain.setValueAtTime(0, now + 0.65);
+    gain.gain.setValueAtTime(0.6, now + 0.5);
+    gain.gain.setValueAtTime(0, now + 0.7);
 
     osc.start(now);
-    osc.stop(now + 0.7);
+    osc.stop(now + 0.75);
+    console.log('[AUDIO] Beep reproducido');
   } catch (e) {
     console.warn('[AUDIO] Error:', e);
   }
@@ -123,17 +132,30 @@ export async function showPushNotification(title, body) {
   }
 }
 
-// Desbloquear AudioContext con primer toque del usuario
-export function unlockAudio() {
+// Desbloquear AudioContext con interacción del usuario
+export async function unlockAudio() {
   const ctx = getAudioCtx();
   if (ctx.state === 'suspended') {
-    ctx.resume();
+    await ctx.resume();
   }
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0, ctx.currentTime);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.01);
+  // Reproducir un beep corto real para confirmar que funciona
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.setValueAtTime(0, ctx.currentTime + 0.1);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.15);
+    console.log('[AUDIO] Desbloqueado, estado:', ctx.state);
+  } catch (e) {
+    console.warn('[AUDIO] Error desbloqueando:', e);
+  }
+}
+
+// Verificar si audio está listo
+export function audioListo() {
+  return audioCtx && audioCtx.state === 'running';
 }

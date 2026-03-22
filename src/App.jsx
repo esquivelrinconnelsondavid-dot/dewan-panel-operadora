@@ -68,15 +68,11 @@ function Panel() {
     requestPushPermission();
   }, []);
 
-  // Desbloquear audio con primer toque
+  // Desbloquear audio con CUALQUIER toque (no solo el primero)
   useEffect(() => {
-    const handler = () => {
-      unlockAudio();
-      document.removeEventListener('touchstart', handler);
-      document.removeEventListener('click', handler);
-    };
-    document.addEventListener('touchstart', handler, { once: true });
-    document.addEventListener('click', handler, { once: true });
+    const handler = () => unlockAudio();
+    document.addEventListener('touchstart', handler);
+    document.addEventListener('click', handler);
     return () => {
       document.removeEventListener('touchstart', handler);
       document.removeEventListener('click', handler);
