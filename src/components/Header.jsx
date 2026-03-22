@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { requestPushPermission, unlockAudio } from '../lib/notifications';
 
 export default function Header() {
-  const [permisoNotif, setPermisoNotif] = useState(
-    typeof Notification !== 'undefined' ? Notification.permission : 'denied'
-  );
+  const [permisoNotif, setPermisoNotif] = useState('default');
 
   useEffect(() => {
     if (typeof Notification !== 'undefined') {
@@ -35,7 +33,7 @@ export default function Header() {
         ) : (
           <span className="text-[11px] text-encamino font-semibold">🔔 On</span>
         )}
-        <span className="w-2 h-2 rounded-full bg-encamino animate-pulse" />
+        <span className="w-2 h-2 rounded-full bg-encamino" />
       </div>
     </header>
   );

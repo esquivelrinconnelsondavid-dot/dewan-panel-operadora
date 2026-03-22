@@ -1,8 +1,24 @@
 let audioCtx = null;
+let swRegistration = null;
 
 function getAudioCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   return audioCtx;
+}
+
+// Registrar Service Worker para notificaciones en móvil
+async function registrarSW() {
+  if (swRegistration) return swRegistration;
+  if ('serviceWorker' in navigator) {
+    try {
+      swRegistration = await navigator.serviceWorker.register('/sw.js');
+      console.log('[SW] Registrado');
+      return swRegistration;
+    } catch (e) {
+      console.warn('[SW] Error:', e);
+    }
+  }
+  return null;
 }
 
 // Genera un beep urgente con Web Audio API (funciona en silencio)
@@ -64,20 +80,46 @@ export function vibrar() {
   if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
 }
 
-// Push notification del navegador
+// Push notification — usa Service Worker para móvil
 export async function requestPushPermission() {
   if (!('Notification' in window)) return false;
-  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'granted') {
+    await registrarSW();
+    return true;
+  }
   const result = await Notification.requestPermission();
-  return result === 'granted';
+  if (result === 'granted') {
+    await registrarSW();
+    return true;
+  }
+  return false;
 }
 
-export function showPushNotification(title, body) {
+export async function showPushNotification(title, body) {
   if (Notification.permission !== 'granted') return;
+
   try {
-    new Notification(title, { body, icon: '/favicon.ico', vibrate: [300, 100, 300] });
+    // Intentar via Service Worker (funciona en móvil)
+    const sw = await registrarSW();
+    if (sw) {
+      await sw.showNotification(title, {
+        body,
+        icon: '/favicon.ico',
+        vibrate: [300, 100, 300],
+        tag: 'dewan-pedido-' + Date.now(),
+        renotify: true,
+      });
+      return;
+    }
   } catch (e) {
-    console.warn('[PUSH]', e);
+    console.warn('[PUSH-SW] Fallback a Notification API:', e);
+  }
+
+  // Fallback: Notification API (funciona en desktop)
+  try {
+    new Notification(title, { body, icon: '/favicon.ico' });
+  } catch (e) {
+    console.warn('[PUSH] Error:', e);
   }
 }
 
@@ -87,7 +129,6 @@ export function unlockAudio() {
   if (ctx.state === 'suspended') {
     ctx.resume();
   }
-  // Crear un sonido silencioso para desbloquear en iOS/Android
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(0, ctx.currentTime);
