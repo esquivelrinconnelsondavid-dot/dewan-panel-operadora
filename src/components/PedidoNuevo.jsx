@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { timerRestaurante, restauranteNoPuede } from '../lib/webhooks';
 import { stopAlertLoop } from '../lib/notifications';
+import { useSucursales } from '../hooks/useSucursales';
+import SelectorSucursal from './SelectorSucursal';
 
 function tiempoSinAtender(fechaCreacion) {
   const diff = Date.now() - new Date(fechaCreacion).getTime();
@@ -13,6 +15,7 @@ function tiempoSinAtender(fechaCreacion) {
 export default function PedidoNuevo({ pedido }) {
   const [cargando, setCargando] = useState(false);
   const [tiempoTexto, setTiempoTexto] = useState(tiempoSinAtender(pedido.fecha_creacion));
+  const { sucursales, sucursalSeleccionada, setSucursalSeleccionada, requiereSucursal } = useSucursales(pedido);
 
   // Actualizar tiempo sin atender cada segundo
   useState(() => {
@@ -27,20 +30,26 @@ export default function PedidoNuevo({ pedido }) {
   const seleccionarTiempo = async (minutos) => {
     setCargando(true);
     try {
-      // 1. Actualizar Supabase
+      // 1. Actualizar Supabase (incluir sucursal si fue seleccionada)
+      const updateData = {
+        estado_pedido: 'preparando',
+        tiempo_preparacion: minutos,
+        timer_lanzamiento: new Date(Date.now() + minutos * 60000).toISOString(),
+        operadora_atendido: true,
+        operadora_atendido_at: new Date().toISOString(),
+      };
+      if (sucursalSeleccionada) {
+        updateData.sucursal_id = sucursalSeleccionada.id;
+        updateData.sucursal_nombre = sucursalSeleccionada.nombre_completo;
+        updateData.direccion_retiro = sucursalSeleccionada.direccion;
+      }
       await supabase
         .from('pedidos_delivery')
-        .update({
-          estado_pedido: 'preparando',
-          tiempo_preparacion: minutos,
-          timer_lanzamiento: new Date(Date.now() + minutos * 60000).toISOString(),
-          operadora_atendido: true,
-          operadora_atendido_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', pedido.id);
 
       // 2. Notificar a n8n (avisa al cliente por WhatsApp)
-      await timerRestaurante(pedido, minutos).catch((e) =>
+      await timerRestaurante(pedido, minutos, sucursalSeleccionada).catch((e) =>
         console.warn('Webhook timer falló:', e)
       );
 
@@ -123,6 +132,13 @@ export default function PedidoNuevo({ pedido }) {
         )}
       </div>
 
+      {/* Selector de sucursal */}
+      <SelectorSucursal
+        sucursales={sucursales}
+        sucursalSeleccionada={sucursalSeleccionada}
+        onSeleccionar={setSucursalSeleccionada}
+      />
+
       {/* Botones */}
       <div className="flex items-center gap-1.5 flex-wrap">
         <button
@@ -135,7 +151,10 @@ export default function PedidoNuevo({ pedido }) {
           <button
             key={min}
             onClick={() => seleccionarTiempo(min)}
-            className="bg-dewan/15 text-dewan text-xs font-bold px-3 py-2 rounded-lg active:scale-95 transition-transform"
+            disabled={requiereSucursal}
+            className={`bg-dewan/15 text-dewan text-xs font-bold px-3 py-2 rounded-lg active:scale-95 transition-transform ${
+              requiereSucursal ? 'opacity-40 cursor-not-allowed' : ''
+            }`}
           >
             {min}'
           </button>

@@ -3,30 +3,39 @@ import { supabase } from '../lib/supabase';
 import { lanzarMotorizado, cancelarPedido } from '../lib/webhooks';
 import { useTimer } from '../hooks/useTimer';
 import TimerDisplay from './TimerDisplay';
+import { useSucursales } from '../hooks/useSucursales';
+import SelectorSucursal from './SelectorSucursal';
 
 export default function PedidoPreparando({ pedido }) {
   const [cargando, setCargando] = useState(false);
   const { expirado } = useTimer(pedido.timer_lanzamiento);
   const lanzadoRef = useRef(false);
+  const { sucursales, sucursalSeleccionada, setSucursalSeleccionada, requiereSucursal } = useSucursales(pedido);
 
-  // Auto-lanzar cuando timer llega a 0
+  // Auto-lanzar cuando timer llega a 0 (solo si no requiere selección de sucursal)
   useEffect(() => {
-    if (expirado && !lanzadoRef.current) {
+    if (expirado && !lanzadoRef.current && !requiereSucursal) {
       lanzadoRef.current = true;
       lanzar(true);
     }
-  }, [expirado]);
+  }, [expirado, requiereSucursal]);
 
   const lanzar = async (auto = false) => {
     setCargando(true);
     try {
-      // Actualizar estado a confirmado para que n8n lance el broadcast
+      // Actualizar estado a confirmado (incluir sucursal si fue seleccionada)
+      const updateData = { estado_pedido: 'confirmado' };
+      if (sucursalSeleccionada) {
+        updateData.sucursal_id = sucursalSeleccionada.id;
+        updateData.sucursal_nombre = sucursalSeleccionada.nombre_completo;
+        updateData.direccion_retiro = sucursalSeleccionada.direccion;
+      }
       await supabase
         .from('pedidos_delivery')
-        .update({ estado_pedido: 'confirmado' })
+        .update(updateData)
         .eq('id', pedido.id);
 
-      await lanzarMotorizado(pedido.id, auto).catch((e) =>
+      await lanzarMotorizado(pedido, auto, sucursalSeleccionada).catch((e) =>
         console.warn('Webhook lanzar falló:', e)
       );
     } catch (e) {
@@ -90,10 +99,29 @@ export default function PedidoPreparando({ pedido }) {
         )}
       </div>
 
+      {/* Selector de sucursal */}
+      <SelectorSucursal
+        sucursales={sucursales}
+        sucursalSeleccionada={sucursalSeleccionada}
+        onSeleccionar={setSucursalSeleccionada}
+      />
+
+      {/* Alerta si timer expiró pero falta sucursal */}
+      {expirado && requiereSucursal && (
+        <div className="bg-nuevo/20 border border-nuevo/50 rounded-lg p-2 mb-2">
+          <p className="text-xs font-bold text-nuevo text-center animate-pulse">
+            ⚠️ Selecciona sucursal para lanzar motorizado
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center gap-2">
         <button
           onClick={() => lanzar(false)}
-          className="flex-1 bg-encamino text-white text-xs font-bold py-2.5 rounded-lg active:scale-95 transition-transform"
+          disabled={requiereSucursal}
+          className={`flex-1 bg-encamino text-white text-xs font-bold py-2.5 rounded-lg active:scale-95 transition-transform ${
+            requiereSucursal ? 'opacity-40 cursor-not-allowed' : ''
+          }`}
         >
           🚀 Lanzar ahora
         </button>
