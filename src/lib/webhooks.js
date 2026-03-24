@@ -20,19 +20,31 @@ async function llamar(ruta, body) {
   }
 }
 
-export function timerRestaurante(pedido, minutos) {
+export function timerRestaurante(pedido, minutos, sucursal = null) {
   return llamar('timer-restaurante', {
     pedido_id: pedido.id,
     minutos,
     conversation_id: pedido.conversation_id,
     cliente_nombre: pedido.cliente_nombre,
-    restaurante: pedido.restaurante,
+    restaurante: sucursal?.nombre_completo || pedido.restaurante,
+    sucursal_id: sucursal?.id || null,
     detalle_pedido: pedido.detalle_pedido,
   });
 }
 
-export function lanzarMotorizado(pedidoId, auto = false) {
-  return llamar('lanzar-motorizado', { pedido_id: pedidoId, auto });
+export function lanzarMotorizado(pedido, auto = false, sucursal = null) {
+  return llamar('lanzar-motorizado', {
+    pedido_id: pedido.id,
+    auto,
+    cliente_nombre: pedido.cliente_nombre,
+    detalle_pedido: pedido.detalle_pedido,
+    direccion_entrega: pedido.direccion_entrega,
+    restaurante: sucursal?.nombre_completo || pedido.restaurante,
+    sucursal_id: sucursal?.id || null,
+    sucursal_direccion: sucursal?.direccion || null,
+    direccion_retiro: sucursal?.direccion || pedido.direccion_retiro || pedido.restaurante,
+    conversation_id: pedido.conversation_id,
+  });
 }
 
 export function cancelarPedido(pedido, razon = 'Cancelado por operadora') {
