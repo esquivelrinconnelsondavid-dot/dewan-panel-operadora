@@ -55,6 +55,11 @@ export function useSucursales(pedido) {
       }
 
       setSucursales(data);
+
+      // Auto-seleccionar la sucursal más cercana si hay coordenadas
+      if (data[0]?._distancia != null) {
+        setSucursalSeleccionada(data[0]);
+      }
     };
 
     // Si el pedido ya tiene sucursal_id seleccionada, usarla
