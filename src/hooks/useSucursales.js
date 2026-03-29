@@ -40,14 +40,18 @@ export function useSucursales(pedido) {
       }
 
       // Múltiples sucursales: ordenar por distancia si hay coordenadas del cliente
-      if (pedido.latitud_cliente && pedido.longitud_cliente) {
+      const latCliente = parseFloat(pedido.ubicacion_lat);
+      const lngCliente = parseFloat(pedido.ubicacion_lng);
+      if (latCliente && lngCliente) {
         data.forEach((s) => {
-          if (s.latitud && s.longitud) {
+          const latSuc = parseFloat(s.latitud);
+          const lngSuc = parseFloat(s.longitud);
+          if (latSuc && lngSuc) {
             s._distancia = calcularDistancia(
-              pedido.latitud_cliente,
-              pedido.longitud_cliente,
-              s.latitud,
-              s.longitud
+              latCliente,
+              lngCliente,
+              latSuc,
+              lngSuc
             );
           }
         });
